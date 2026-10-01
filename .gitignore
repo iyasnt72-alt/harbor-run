@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.log
+unreal-review/Saved/
+unreal-review/Intermediate/
+unreal-review/DerivedDataCache/
+unreal-review/.vs/

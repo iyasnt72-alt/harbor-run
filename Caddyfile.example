@@ -1,0 +1,4 @@
+# Replace this hostname with your real DNS name. Caddy obtains a trusted certificate.
+harbor.example.com {
+    reverse_proxy 127.0.0.1:3000
+}

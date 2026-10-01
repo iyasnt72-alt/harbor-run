@@ -1,0 +1,9 @@
+*
+!package.json
+!package-lock.json
+!server.mjs
+!graphics-assets.mjs
+!public/
+!public/**
+!LICENSE
+!THIRD_PARTY.md
