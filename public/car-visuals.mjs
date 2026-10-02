@@ -8,13 +8,20 @@ export function setupReflections(renderer,scene){
  ctx.fillStyle='#edf3e8';for(const [x,y,w,h]of [[45,70,100,8],[190,92,65,6],[330,65,115,9]])ctx.fillRect(x,y,w,h);
  ctx.fillStyle='#546878';for(let i=0;i<20;i++)ctx.fillRect(i*27,124-(i%4)*5,15+(i%3)*4,18+(i%4)*5);
  const texture=new THREE.CanvasTexture(canvas);texture.mapping=THREE.EquirectangularReflectionMapping;texture.colorSpace=THREE.SRGBColorSpace;
- const pmrem=new THREE.PMREMGenerator(renderer);let target=pmrem.fromEquirectangular(texture);scene.environment=target.texture;scene.environmentIntensity=.65;texture.dispose();
- // The original procedural map is immediately available, including offline/error fallback.
- new HDRLoader().load('/assets/venice_sunset_1k.hdr',hdr=>{
-  const photo=pmrem.fromEquirectangular(hdr);scene.environment=photo.texture;scene.environmentIntensity=.7;
-  target.dispose();target=photo;hdr.dispose();pmrem.dispose();
- },undefined,()=>pmrem.dispose());
- return {dispose(){target.dispose();}};
+ const pmrem=new THREE.PMREMGenerator(renderer),fallback=pmrem.fromEquirectangular(texture);pmrem.dispose();texture.dispose();
+ let photo=null,loading=false,quality='low',disposed=false;
+ function apply(){scene.environment=quality==='high'&&photo?photo.texture:fallback.texture;scene.environmentIntensity=(quality==='high'&&photo)?0.7:0.65;}
+ apply();
+ return {configure(next){
+  quality=next;apply();
+  // Keep Low/Auto on the small generated sky; fetch and process HDR only on request.
+  if(quality!=='high'||photo||loading||disposed)return;
+  loading=true;
+  new HDRLoader().load('/assets/venice_sunset_1k.hdr',hdr=>{
+   if(disposed){hdr.dispose();return;}
+   const generator=new THREE.PMREMGenerator(renderer);photo=generator.fromEquirectangular(hdr);generator.dispose();hdr.dispose();loading=false;apply();
+  },undefined,()=>{loading=false;});
+ },dispose(){disposed=true;fallback.dispose();photo?.dispose();}};
 }
 
 let beamTexture;

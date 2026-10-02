@@ -11,24 +11,29 @@ import {createGraphics} from './graphics.mjs';
 import {GLTFLoader} from '/vendor/GLTFLoader.js';
 const $=id=>document.getElementById(id),canvas=$('game');
 let renderer;
-try{renderer=new THREE.WebGLRenderer({canvas,antialias:!matchMedia('(pointer:coarse)').matches,powerPreference:'high-performance'});}catch(e){$('joinError').textContent='This device needs WebGL 2 enabled to play.';throw e;}
+try{renderer=new THREE.WebGLRenderer({canvas,antialias:false,powerPreference:'high-performance'});}catch(e){$('joinError').textContent='This device needs WebGL 2 enabled to play.';throw e;}
 const phone=matchMedia('(pointer:coarse)').matches;
-let quality=phone?'auto':'high';
-try{const saved=localStorage.getItem('harbor-graphics');if(['auto','low','high'].includes(saved))quality=saved;}catch{}
+// Start existing and new players on the lighter preset once. Later choices persist.
+const graphicsPreference='harbor-graphics-v2';
+let quality='low';
+try{const saved=localStorage.getItem(graphicsPreference);if(['auto','low','high'].includes(saved))quality=saved;}catch{}
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 function applyQuality(){
- renderer.setPixelRatio(quality==='low'?1:quality==='high'?Math.min(devicePixelRatio,1.75):Math.min(devicePixelRatio,phone?1.25:1.5));renderer.setSize(innerWidth,innerHeight);
- renderer.shadowMap.enabled=quality==='high'||(!phone&&quality==='auto');
- const shadowSize=quality==='high'?2048:1024;
+ // Cap the 3D buffer independently of the crisp HTML interface, including on 4K screens.
+ const maxEdge=quality==='low'?960:quality==='auto'?1280:1920;
+ renderer.setPixelRatio(Math.min(devicePixelRatio,quality==='high'?1.5:1,maxEdge/Math.max(innerWidth,innerHeight)));renderer.setSize(innerWidth,innerHeight);
+ renderer.shadowMap.enabled=quality==='high';
+ const shadowSize=1024;
  if(sun.shadow.mapSize.x!==shadowSize){sun.shadow.map?.dispose();sun.shadow.map=null;sun.shadow.mapSize.set(shadowSize,shadowSize);}
- world.setShadows(renderer.shadowMap.enabled);graphics.configure(quality,phone,innerWidth,innerHeight);
+ if(!renderer.shadowMap.enabled&&sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null;}
+ world.setShadows(renderer.shadowMap.enabled);world.setQuality(quality);reflections.configure(quality);graphics.configure(quality,phone,innerWidth,innerHeight);
  $('quality').textContent='Graphics: '+quality[0].toUpperCase()+quality.slice(1);
  $('quality').setAttribute('aria-label','Graphics: '+quality+'. Change quality');
- try{localStorage.setItem('harbor-graphics',quality);}catch{}
+ try{localStorage.setItem(graphicsPreference,quality);}catch{}
 }
 renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.05;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xc9b9ad);scene.fog=new THREE.Fog(0xc9b9ad,100,480);
-setupReflections(renderer,scene);
+const reflections=setupReflections(renderer,scene);
 const camera=new THREE.PerspectiveCamera(64,innerWidth/innerHeight,.1,1000);
 scene.add(new THREE.HemisphereLight(0xaecae3,0x756557,1.25));scene.add(new THREE.AmbientLight(0xbfd0df,.22));const sun=new THREE.DirectionalLight(0xffd2a6,3.15);sun.position.set(-75,95,-45);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-55,right:55,top:55,bottom:-55,near:1,far:280});sun.shadow.bias=-.0006;sun.shadow.normalBias=.055;sun.shadow.camera.updateProjectionMatrix();scene.add(sun,sun.target);
 const world=createWorld(scene),festival=createFestival(scene),graphics=createGraphics(renderer,scene,camera);
@@ -39,7 +44,7 @@ for(const definition of VEHICLES){
  const car=makeCar(scene);car.position.set(definition.x,0,definition.z);car.rotation.y=definition.a;cars.set(definition.id,car);
  new GLTFLoader().load('/assets/'+definition.asset+'.glb',gltf=>{const shadow=car.children[0];car.clear();gltf.scene.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});car.add(shadow,gltf.scene);dressCar(car,gltf.scene);},undefined,()=>console.warn(definition.name+' model unavailable; using fallback.'));
 }
-applyQuality();$('quality').onclick=()=>{quality=quality==='auto'?'low':quality==='low'?'high':'auto';applyQuality();};
+applyQuality();$('quality').onclick=()=>{quality=quality==='low'?'auto':quality==='auto'?'high':'low';applyQuality();};
 new GLTFLoader().load('/assets/courier.glb',gltf=>{setAvatarTemplate(gltf.scene);for(const a of actors.values())scene.remove(a);actors.clear();if(state)syncState();},undefined,()=>console.warn('Using the original courier model.'));
 new GLTFLoader().load('/assets/garden-kiosk.glb',gltf=>{for(const [x,z]of [[130,78],[88,143]]){const kiosk=gltf.scene.clone(true);kiosk.position.set(x,.25,z);kiosk.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});scene.add(kiosk);}},undefined,()=>console.warn('Garden kiosk unavailable.'));
 const jobMarker=beacon({x:0,z:0},0x64eee1);jobMarker.g.visible=false;
@@ -137,11 +142,11 @@ function drawMap(){
  for(const p of state?.players||[]){map.fillStyle=p.id===id?'#ffffff':'#9cdad4';map.beginPath();map.arc(at(p.x),at(p.z),p.id===id?4:3,0,Math.PI*2);map.fill();if(p.id===id){map.strokeStyle='#183e4a';map.lineWidth=2;map.stroke();}}
 }
 const clock=new THREE.Clock(),target=new THREE.Vector3(),desired=new THREE.Vector3();camera.position.set(95,110,140);let mapTime=0,frameCount=0,fpsTime=0;
-function frame(){requestAnimationFrame(frame);const dt=Math.min(clock.getDelta(),.1),time=clock.elapsedTime,k=1-Math.exp(-14*dt);const ambientTime=reducedMotion?0:time;world.update(ambientTime);depot.diamond.rotation.y=ambientTime;drop.diamond.rotation.y=-ambientTime;depot.diamond.position.y=4+Math.sin(ambientTime*2)*.3;drop.diamond.position.y=4+Math.sin(ambientTime*2)*.3;
+function frame(){requestAnimationFrame(frame);if(document.hidden){clock.getDelta();fpsTime=clock.elapsedTime;frameCount=0;return;}const dt=Math.min(clock.getDelta(),.1),time=clock.elapsedTime,k=1-Math.exp(-14*dt);const ambientTime=reducedMotion?0:time;world.update(ambientTime);depot.diamond.rotation.y=ambientTime;drop.diamond.rotation.y=-ambientTime;depot.diamond.position.y=4+Math.sin(ambientTime*2)*.3;drop.diamond.position.y=4+Math.sin(ambientTime*2)*.3;
  if(state){for(const p of state.players){const a=actors.get(p.id);const speed=Math.hypot(p.x-a.position.x,p.z-a.position.z)*14;a.position.x+=(p.x-a.position.x)*k;a.position.z+=(p.z-a.position.z)*k;a.rotation.y=p.a;a.userData.animate(time,speed,reducedMotion?null:p.emote?.name,p.job?.kind==='fishing'&&p.job.phase!=='travel');}for(const c of state.cars){const model=cars.get(c.id);if(!model)continue;model.position.x+=(c.x-model.position.x)*k;model.position.z+=(c.z-model.position.z)*k;let delta=c.a-model.rotation.y;delta=Math.atan2(Math.sin(delta),Math.cos(delta));model.rotation.y+=delta*k;updateCar(model,c,dt,{reducedMotion,quality});}const me=actors.get(id);if(me){target.set(me.position.x,1.4,me.position.z);desired.set(target.x+Math.sin(camYaw)*camDist,target.y+camDist*.26,target.z+Math.cos(camYaw)*camDist);cameraPosition(target,desired);camera.position.lerp(desired,1-Math.exp(-7*dt));camera.lookAt(target);}}
  else{camera.position.set(95+(reducedMotion?0:Math.sin(time*.03)*28),110,140);camera.lookAt(0,0,-50);}
  const driven=state&&drivenCar(state,id),myModel=driven&&cars.get(driven.id);
- headBeam.visible=!!myModel&&(quality==='high'||(!phone&&quality==='auto'));
+ headBeam.visible=!!myModel&&quality==='high';
  if(myModel){const a=myModel.rotation.y;headBeam.position.set(myModel.position.x+Math.sin(a)*2,1.05,myModel.position.z+Math.cos(a)*2);headBeam.target.position.set(myModel.position.x+Math.sin(a)*16,.25,myModel.position.z+Math.cos(a)*16);}
  if(joined&&!document.hidden)carAudio.update(state?.cars||[],{x:target.x,z:target.z,yaw:camYaw},id);
  sun.target.position.copy(target);sun.position.set(target.x-75,target.y+95,target.z-45);

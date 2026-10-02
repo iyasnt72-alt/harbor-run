@@ -5,8 +5,7 @@ import {SSAOPass} from './vendor/effects/postprocessing/SSAOPass.js';
 import {UnrealBloomPass} from './vendor/effects/postprocessing/UnrealBloomPass.js';
 import {OutputPass} from './vendor/effects/postprocessing/OutputPass.js';
 
-// Keep the expensive normal/depth pass at half resolution. Low and mobile
-// Auto use the direct renderer; switching to Low releases the effect buffers.
+// Only the optional High preset uses effects. Low and Auto render directly.
 export function createGraphics(renderer, scene, camera) {
  let composer=null, ao, bloom;
  renderer.info.autoReset=false;
@@ -19,10 +18,10 @@ export function createGraphics(renderer, scene, camera) {
  }
  return {
   configure(quality,phone,width,height){
-   const enabled=quality==='high'||(quality==='auto'&&!phone);
+   const enabled=quality==='high';
    if(!enabled){release();return;}
    if(!composer){
-    const target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:4});
+    const target=new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:2});
     composer=new EffectComposer(renderer,target);
     composer.addPass(new RenderPass(scene,camera));
     ao=new SSAOPass(scene,camera,1,1,16);

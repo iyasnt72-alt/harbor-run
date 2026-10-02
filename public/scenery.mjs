@@ -202,11 +202,14 @@ export function createWorld(scene){
  #include <tonemapping_fragment>
  #include <colorspace_fragment>
  }`});
- const water=new THREE.Mesh(new THREE.PlaneGeometry(1800,1800,36,36),waterMaterial);water.rotation.x=-Math.PI/2;water.position.y=-1;scene.add(water);
+ const flatWater=new THREE.MeshBasicMaterial({color:0x284f5b});
+ const simpleWaterGeometry=new THREE.PlaneGeometry(1800,1800);
+ const detailedWaterGeometry=new THREE.PlaneGeometry(1800,1800,36,36);
+ const water=new THREE.Mesh(simpleWaterGeometry,flatWater);water.rotation.x=-Math.PI/2;water.position.y=-1;scene.add(water);
  // Distant landscape is outside the playable island.
  createAtmosphere(scene);
  const sky=new THREE.Mesh(new THREE.SphereGeometry(850,16,8),new THREE.ShaderMaterial({side:THREE.BackSide,depthWrite:false,vertexShader:'varying vec3 pos;void main(){pos=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'varying vec3 pos;void main(){float a=clamp(normalize(pos).y*.8,0.,1.);gl_FragColor=vec4(mix(vec3(.87,.66,.46),vec3(.27,.48,.68),sqrt(a)),1.);}'}));scene.add(sky);
- return {update(time){waterMaterial.uniforms.time.value=time;},setShadows(enabled){shadows.visible=!enabled;},staticDrawCalls:batches.size+3};
+ return {update(time){waterMaterial.uniforms.time.value=time;},setShadows(enabled){shadows.visible=!enabled;},setQuality(quality){const detailed=quality==='high';water.material=detailed?waterMaterial:flatWater;water.geometry=detailed?detailedWaterGeometry:simpleWaterGeometry;},staticDrawCalls:batches.size+3};
 }
 function meshBox(parent,x,y,z,w,h,d,color){const m=new THREE.Mesh(cube,material(color));m.position.set(x,y,z);m.scale.set(w,h,d);parent.add(m);return m;}
 function blob(parent,w,d){const m=new THREE.Mesh(new THREE.CircleGeometry(1,18),new THREE.MeshBasicMaterial({color:0x15343d,transparent:true,opacity:.24,depthWrite:false}));m.rotation.x=-Math.PI/2;m.position.y=.22;m.scale.set(w,d,1);parent.add(m);}
