@@ -1,5 +1,21 @@
 # Harbor Run — Sunset Streets
 
+## Lighter graphics update — 2 October 2026
+
+Play online: https://harbor-run.onrender.com/?room=friends
+
+Low is now the default on every device, including a one-time reset of the older
+saved High/Auto preference. Later choices are saved. Crew → Graphics cycles
+Low → Auto → High. Low caps the 3D canvas to a 960-pixel longest edge; Auto caps
+it at 1280, and High at 1920. HTML controls and text retain their normal resolution.
+Low and Auto use direct rendering without dynamic shadows, bloom, ambient
+occlusion or multisampling, with flat water and a small generated sky reflection.
+The photo HDR loads only when High is selected. High remains optional with a
+1024px shadow map and two-sample effects buffer. Hidden pages skip scene rendering.
+The older graphics descriptions below document earlier releases and are
+superseded by these defaults. This reduces rendering cost; actual performance
+still depends on the player's hardware and network.
+
 A 3D multiplayer browser prototype for up to eight friends per room. Explore South Quay, find eight shared cars around the city, race on foot, hunt stars, deliver parcels, and hang out with text and optional voice chat.
 
 ## New in Street Detail (0.8)
@@ -133,7 +149,7 @@ folder with freshly installed production dependencies. Docker itself was not
 available locally, so a container build and the hosted HTTPS/WebSocket path still
 need to be verified during deployment.
 
-This delivery is **local and runnable, not deployed online**. To play across the Internet:
+The game is published at https://harbor-run.onrender.com/. To play across the Internet:
 
 1. Run one persistent Node process on an Internet-reachable host. Use Node 22+, install dependencies, and run `npm start`. Set `PORT` if your host assigns one. Default bind is `0.0.0.0:3000`; `HOST` can override it. A static-only host cannot run this server.
 2. Put it behind a trusted HTTPS reverse proxy or a platform with managed TLS. Proxy both HTTP and WebSocket upgrades to the same process. Preserve the original `Host` header for the origin check. Use a domain with a valid certificate. Share `https://your-domain/?room=your-code`.
